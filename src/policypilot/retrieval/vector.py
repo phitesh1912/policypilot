@@ -71,7 +71,14 @@ class VectorRetriever(Retriever):
             return 0
         return self.client.count(self.collection, exact=True).count
 
-    def search(self, query: str, user: User, k: int = 10) -> list[RetrievedChunk]:
+    def search(
+        self,
+        query: str,
+        user: User,
+        k: int = 10,
+        *,
+        query_vector: list[float] | None = None,
+    ) -> list[RetrievedChunk]:
         if not self.client.collection_exists(self.collection):
             return []
         # Access control is a pre-filter inside the ANN search: forbidden regions never compete.
@@ -84,7 +91,7 @@ class VectorRetriever(Retriever):
         )
         result = self.client.query_points(
             self.collection,
-            query=self.provider.embed_one(query),
+            query=query_vector if query_vector is not None else self.provider.embed_one(query),
             query_filter=region_filter,
             limit=k,
             with_payload=True,

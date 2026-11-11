@@ -48,6 +48,16 @@ def test_complete_refuses_when_nothing_overlaps():
     assert p.complete("sys", _prompt(blocks, "quantum physics?")).text == REFUSAL_TEXT
 
 
+def test_complete_refuses_on_a_single_shared_word():
+    # Regression: "office wifi password" overlapped the remote-work policy on "office" alone and
+    # the fake happily "answered" with the hybrid-work rules.
+    p = FakeProvider()
+    blocks = [("[rw:hybrid]", "Remote > Hybrid\n\nWork from the office two days a week.")]
+    assert p.complete("sys", _prompt(blocks, "what is the office wifi password?")).text == (
+        REFUSAL_TEXT
+    )
+
+
 def test_complete_picks_best_block_and_cites_it():
     p = FakeProvider()
     blocks = [

@@ -45,3 +45,7 @@ src = ["src", "tests", "eval"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom puts these calls in argument defaults by design.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query"]

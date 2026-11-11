@@ -44,8 +44,9 @@ class FakeProvider(LLMProvider):
     embed_model = "fake-embed"
     embed_dim = 64
 
-    def __init__(self, dim: int = 64) -> None:
+    def __init__(self, dim: int = 64, min_overlap_ratio: float = 0.4) -> None:
         self.embed_dim = dim
+        self.min_overlap_ratio = min_overlap_ratio
         self._cache: dict[str, np.ndarray] = {}
         self.calls: list[tuple[str, str]] = []  # (kind, payload) for assertions in tests
 
@@ -94,7 +95,9 @@ class FakeProvider(LLMProvider):
             overlap = len(q & set(tokenize(body)))
             if overlap > best_overlap:
                 best, best_overlap = (cite, body), overlap
-        if best is None:
+        # Stand-in for the real model's judgement: only "answer" when the best block covers a
+        # meaningful share of the question. One shared word ("office") is not grounding.
+        if best is None or best_overlap < 2 or best_overlap < self.min_overlap_ratio * len(q):
             return REFUSAL_TEXT
         cite, body = best
         # Drop the "Title > Section" prefix line if present, then take the first two sentences.

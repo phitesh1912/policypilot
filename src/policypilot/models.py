@@ -75,3 +75,47 @@ class RetrievedChunk(BaseModel):
     score: float
     rank: int
     source: str = Field(description="'bm25', 'vector' or 'hybrid'")
+    sources: dict[str, int] = Field(
+        default_factory=dict, description="per-retriever rank, populated by the hybrid fuser"
+    )
+
+
+class Citation(BaseModel):
+    tag: str
+    doc_id: str
+    title: str
+    section: str
+    chunk_id: str
+    region: Region
+    version: str
+
+
+class TokenUsage(BaseModel):
+    prompt: int = 0
+    completion: int = 0
+    embedding: int = 0
+    context: int = Field(0, description="tokens of retrieved context packed into the prompt")
+
+    @property
+    def total(self) -> int:
+        return self.prompt + self.completion + self.embedding
+
+
+class RetrievalTrace(BaseModel):
+    chunk_id: str
+    doc_id: str
+    section: str
+    score: float
+    sources: dict[str, int]
+    in_context: bool
+
+
+class AskResult(BaseModel):
+    answer: str
+    citations: list[Citation]
+    refused: bool
+    cached: bool = False
+    tokens: TokenUsage
+    cost_usd: float
+    retrieved: list[RetrievalTrace] = Field(default_factory=list)
+    latency_ms: float = 0.0
