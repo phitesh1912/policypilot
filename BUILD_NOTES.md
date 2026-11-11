@@ -45,3 +45,21 @@ findings go here.
   eval harness is what measures this layer for real providers.
 - **Tests:** `tests/test_fake_provider.py::test_complete_refuses_on_a_single_shared_word`,
   `tests/test_engine.py::test_unanswerable_question_is_refused`.
+
+## 4. Chunk-size comparison was a no-op (2026-11-11)
+
+- **Where:** `eval/run.py` default `--chunk-sizes 350,700`.
+- **Symptom:** the first eval run produced byte-identical rows for 350 and 700 tokens, both with
+  87 chunks. No section in the handbook exceeds 350 tokens, so the windowing path never ran and
+  the "two chunk sizes" comparison measured nothing.
+- **Fix:** compare 150 vs 350 so the smaller size actually splits long sections. Lesson: check
+  that an experimental variable changes the artefact (chunk count) before trusting the metric.
+- **Tests:** none needed; the results table now shows different chunk counts per size.
+
+## 5. Golden set had 51 items, not 50 (2026-11-11)
+
+- **Where:** `eval/golden.json`.
+- **Symptom:** `test_golden_set_is_well_formed_and_targets_real_sections` failed on the count.
+  The same test also validates that every expected `doc:section` id exists in the real corpus,
+  which is what makes the retrieval metrics trustworthy.
+- **Fix:** dropped one redundant IN payroll question.
