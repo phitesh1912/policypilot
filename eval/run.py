@@ -212,6 +212,9 @@ def to_markdown(summaries: list[dict], provider_name: str, judge: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows consoles default to cp1252, which cannot print the table's typographic characters.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("--provider", default="fake", choices=["fake", "gemini", "openai"])
     # 350 is the production size; 150 forces windowing of the longer sections. Larger sizes
@@ -243,9 +246,11 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     judge = "LLM-as-judge" if use_llm_judge else "heuristic (numeric grounding)"
     md = to_markdown(summaries, provider.name, judge)
-    (out / f"results_{provider.name}.md").write_text(md, encoding="utf-8")
+    (out / f"results_{provider.name}.md").write_text(md, encoding="utf-8", newline="\n")
     (out / f"results_{provider.name}.json").write_text(
-        json.dumps({"summaries": summaries, "rows": all_rows}, indent=2), encoding="utf-8"
+        json.dumps({"summaries": summaries, "rows": all_rows}, indent=2),
+        encoding="utf-8",
+        newline="\n",
     )
     print()
     print(md)
