@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     TIKTOKEN_CACHE_DIR=/opt/tiktoken \
+    FASTEMBED_CACHE_DIR=/opt/fastembed \
     QDRANT_PATH=/data/qdrant \
     STATIC_DIR=/app/static
 WORKDIR /app
@@ -20,8 +21,10 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --upgrade pip && pip install . \
-    # Bake the tokenizer tables into the image so startup never needs an outbound download.
-    && python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+    # Bake the tokenizer tables and the local embedding model into the image so startup never
+    # needs an outbound download (and the free-tier cold start stays short).
+    && python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')" \
+    && python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5', cache_dir='/opt/fastembed')"
 
 COPY data ./data
 COPY --from=ui /static ./static

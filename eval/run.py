@@ -1,6 +1,7 @@
 """Eval harness: retrieval quality, refusal behaviour and faithfulness across configurations.
 
     python -m eval.run                      # FakeProvider, offline, deterministic
+    python -m eval.run --provider groq      # needs GROQ_API_KEY; Groq chat + local embeddings
     python -m eval.run --provider gemini    # needs GEMINI_API_KEY; uses an LLM judge
 
 Compares BM25-only, vector-only and hybrid retrieval at two chunk sizes. Writes a markdown table
@@ -216,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--provider", default="fake", choices=["fake", "gemini", "openai"])
+    ap.add_argument("--provider", default="fake", choices=["fake", "groq", "gemini", "openai"])
     # 350 is the production size; 150 forces windowing of the longer sections. Larger sizes
     # (e.g. 700) produce the same chunks as 350 on this corpus because no section is that long.
     ap.add_argument("--chunk-sizes", default="150,350")

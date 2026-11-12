@@ -86,15 +86,19 @@ cd frontend && npm ci && npm run dev             # http://localhost:5173, proxie
 npm run build                                    # emits ../static, served by FastAPI at /
 ```
 
-To use a real model, create a `.env`:
+To use a real model, create a `.env`. The free default is **Groq** for chat (OpenAI-compatible,
+Llama 3.3 70B) plus a **local fastembed model** for vectors, because Groq has no embeddings API:
 
 ```
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=...           # free key from https://aistudio.google.com
-LLM_MODEL=gemini-2.5-flash
-EMBED_MODEL=gemini-embedding-001
+LLM_PROVIDER=groq
+GROQ_API_KEY=gsk_...         # free key from https://console.groq.com
+# optional: LLM_MODEL=llama-3.3-70b-versatile  EMBED_MODEL=BAAI/bge-small-en-v1.5
 ADMIN_TOKEN=change-me        # enables POST /ingest
 ```
+
+Gemini (`LLM_PROVIDER=gemini`, `GEMINI_API_KEY`) and OpenAI (`LLM_PROVIDER=openai`,
+`OPENAI_API_KEY`) use their own embeddings. The `CompositeProvider` is what lets a chat-only
+provider be paired with any embedder behind the same `LLMProvider` interface.
 
 Docker: `docker build -t policypilot . && docker run -p 8000:8000 --env-file .env policypilot`.
 Deployment to Render (one click via `render.yaml`) is covered in [DEPLOY.md](DEPLOY.md).
@@ -152,9 +156,9 @@ correct (hit@5 ≥ 0.95 everywhere), **zero region leaks in 300 answers**, zero 
 BM25/hybrid, and the chunk-size comparison shows the handbook's sections are short enough that
 chunk size barely matters here (88 vs 87 chunks).
 
-### Results — Gemini
+### Results — real model (Groq + local embeddings)
 
-*Not yet run.* Will be filled in from `python -m eval.run --provider gemini` with an LLM judge;
+*Not yet run.* Will be filled in from `python -m eval.run --provider groq` with an LLM judge;
 no numbers will be written here that did not come from that command.
 
 ## Security notes

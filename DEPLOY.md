@@ -4,22 +4,27 @@ The app is one container: FastAPI serves the API and the built React UI. State i
 Qdrant directory that is rebuilt from `data/policies/` at startup, so the container is effectively
 stateless and safe to redeploy at will.
 
-## 1. Get a free Gemini key
+## 1. Get a free key
 
-1. Go to <https://aistudio.google.com> and sign in with a Google account.
-2. **Get API key → Create API key**. Copy it; it is shown once.
-3. The free tier is enough for the demo and the eval. Models used by default:
-   `gemini-2.5-flash` (chat) and `gemini-embedding-001` (embeddings, 768 dims).
+**Groq (default, free):** <https://console.groq.com> → API Keys → Create. Chat runs on
+`llama-3.3-70b-versatile`; vectors come from a local `fastembed` model (`BAAI/bge-small-en-v1.5`,
+384 dims, ~130 MB downloaded once and baked into the Docker image), because Groq has no
+embeddings endpoint.
 
-Never commit the key. Locally it goes in `.env` (git-ignored); on Render it goes in the dashboard.
+**Gemini (alternative):** <https://aistudio.google.com> → Get API key. Uses `gemini-2.5-flash`
+and `gemini-embedding-001`.
+
+Never commit a key. Locally it goes in `.env` (git-ignored); on Render it goes in the dashboard.
 
 ## 2. Environment variables
 
 | Variable | Default | Notes |
 |---|---|---|
-| `LLM_PROVIDER` | `fake` | `fake` \| `gemini` \| `openai`. `fake` needs no key and is what CI uses. |
-| `LLM_MODEL` | `gemini-2.5-flash` | Chat model name for the chosen provider |
-| `EMBED_MODEL` | `gemini-embedding-001` | Embedding model name |
+| `LLM_PROVIDER` | `fake` | `fake` \| `groq` \| `gemini` \| `openai`. `fake` needs no key and is what CI uses. |
+| `LLM_MODEL` | provider default | `llama-3.3-70b-versatile` / `gemini-2.5-flash` / `gpt-4o-mini` |
+| `EMBED_MODEL` | provider default | `BAAI/bge-small-en-v1.5` (groq, local) / `gemini-embedding-001` / `text-embedding-3-small` |
+| `GROQ_API_KEY` | — | Required when `LLM_PROVIDER=groq` |
+| `FASTEMBED_CACHE_DIR` | fastembed default | Where the local embedding model is stored (`/opt/fastembed` in the image) |
 | `GEMINI_API_KEY` | — | Required when `LLM_PROVIDER=gemini` |
 | `OPENAI_API_KEY` | — | Required when `LLM_PROVIDER=openai` |
 | `ADMIN_TOKEN` | — | Bearer token for `POST /ingest`. If unset, ingest returns 503. |
@@ -31,7 +36,7 @@ Never commit the key. Locally it goes in `.env` (git-ignored); on Render it goes
 | `REFUSAL_THRESHOLD` | `0.02` | Minimum top fused score to call the model |
 | `CONTEXT_BUDGET_TOKENS` | `1800` | Max retrieved tokens packed into the prompt |
 | `CACHE_CAPACITY` / `CACHE_SIMILARITY_THRESHOLD` | `256` / `0.95` | Semantic cache |
-| `PRICE_INPUT_PER_1M` / `PRICE_OUTPUT_PER_1M` / `PRICE_EMBED_PER_1M` | `0.30` / `2.50` / `0.15` | USD per 1M tokens for the cost estimate; set to your provider's current price sheet |
+| `PRICE_INPUT_PER_1M` / `PRICE_OUTPUT_PER_1M` / `PRICE_EMBED_PER_1M` | `0.59` / `0.79` / `0` | USD per 1M tokens for the cost estimate (defaults ≈ Groq Llama 3.3 70B list price; local embeddings are free); set to your provider's current price sheet |
 | `PORT` | `8000` | Render sets this automatically |
 
 ## 3. Render (recommended, free tier)
@@ -42,8 +47,9 @@ Never commit the key. Locally it goes in `.env` (git-ignored); on Render it goes
 2. In Render: **New → Blueprint**, pick the repo. Render reads `render.yaml` and proposes one web
    service named `policypilot` (Docker runtime, free plan, Singapore region — change `region` if
    you prefer).
-3. When prompted for `GEMINI_API_KEY`, paste the key from step 1. `ADMIN_TOKEN` is generated
-   for you; copy it from the service's Environment tab if you want to call `/ingest`.
+3. When prompted for `GROQ_API_KEY`, paste the key from step 1 (or switch `LLM_PROVIDER` and
+   add `GEMINI_API_KEY`). `ADMIN_TOKEN` is generated for you; copy it from the service's
+   Environment tab if you want to call `/ingest`.
 4. Click **Apply**. The first build takes ~3–4 minutes (Node build stage + Python stage).
 5. Open the service URL. `/health` should return `"provider": "gemini"` and the chunk count.
 
@@ -92,11 +98,11 @@ in the portal or via `--yaml` if you want restarts on failure.
 The eval runs locally but uses the same provider configuration:
 
 ```bash
-LLM_PROVIDER=gemini GEMINI_API_KEY=... python -m eval.run --provider gemini
+GROQ_API_KEY=... python -m eval.run --provider groq
 ```
 
-It writes `eval/results/results_gemini.md`. Copy that table into the README's Gemini section —
-that is the only sanctioned way numbers get there.
+It writes `eval/results/results_groq+fastembed.md`. Copy that table into the README's real-model
+section — that is the only sanctioned way numbers get there.
 
 ## 7. Local development
 
