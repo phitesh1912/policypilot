@@ -5,7 +5,8 @@ from policypilot.llm.base import LLMProvider
 from policypilot.llm.fake import FakeProvider
 
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-GROQ_DEFAULT_MODEL = "llama-3.3-70b-versatile"
+# Groq retired its Llama 3.x endpoints in 2026; gpt-oss-120b is the strongest free option.
+GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
 
 
 def build_provider(settings: Settings) -> LLMProvider:

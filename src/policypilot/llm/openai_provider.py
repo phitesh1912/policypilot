@@ -22,7 +22,8 @@ class OpenAIProvider(LLMProvider):
     ) -> None:
         from openai import OpenAI
 
-        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        # Free tiers rate-limit by tokens/minute; the SDK honours Retry-After on 429s.
+        self._client = OpenAI(api_key=api_key, base_url=base_url, max_retries=8)
         self.chat_model = chat_model
         self.embed_model = embed_model
         self.embed_dim = embed_dim

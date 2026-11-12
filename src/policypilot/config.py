@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     fastembed_cache_dir: Path | None = Field(None, description="where fastembed stores model files")
     # Approximate list prices in USD per 1M tokens; override to match your provider's current
     # price sheet. Used only for the per-query cost estimate shown in the UI. Defaults are in the
-    # range of Groq's llama-3.3-70b pricing; local embeddings cost 0.
-    price_input_per_1m: float = 0.59
-    price_output_per_1m: float = 0.79
+    # range of Groq's gpt-oss-120b pricing; local embeddings cost 0.
+    price_input_per_1m: float = 0.15
+    price_output_per_1m: float = 0.60
     price_embed_per_1m: float = 0.0
 
     # --- Vector store -----------------------------------------------------------------------

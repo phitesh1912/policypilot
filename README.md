@@ -87,12 +87,13 @@ npm run build                                    # emits ../static, served by Fa
 ```
 
 To use a real model, create a `.env`. The free default is **Groq** for chat (OpenAI-compatible,
-Llama 3.3 70B) plus a **local fastembed model** for vectors, because Groq has no embeddings API:
+`openai/gpt-oss-120b`) plus a **local fastembed model** for vectors, because Groq has no
+embeddings API:
 
 ```
 LLM_PROVIDER=groq
 GROQ_API_KEY=gsk_...         # free key from https://console.groq.com
-# optional: LLM_MODEL=llama-3.3-70b-versatile  EMBED_MODEL=BAAI/bge-small-en-v1.5
+# optional: LLM_MODEL=openai/gpt-oss-20b  EMBED_MODEL=BAAI/bge-small-en-v1.5
 ADMIN_TOKEN=change-me        # enables POST /ingest
 ```
 
@@ -156,10 +157,28 @@ correct (hit@5 ≥ 0.95 everywhere), **zero region leaks in 300 answers**, zero 
 BM25/hybrid, and the chunk-size comparison shows the handbook's sections are short enough that
 chunk size barely matters here (88 vs 87 chunks).
 
-### Results — real model (Groq + local embeddings)
+### Results — real model (Groq `openai/gpt-oss-20b` + local `bge-small` embeddings)
 
-*Not yet run.* Will be filled in from `python -m eval.run --provider groq` with an LLM judge;
-no numbers will be written here that did not come from that command.
+Run 2026-11-12 with `python -m eval.run --provider groq`. Groq's free tier caps tokens per
+minute, so the model answered only the production configuration (hybrid, 350 tokens); the other
+five rows score retrieval alone, which needs no model calls because embeddings are local.
+
+| retriever | chunk_tokens | mode | hit@5 | mrr | false_refusal | refusal_acc | region_leaks | faithfulness (LLM judge) | citation_precision | avg latency |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bm25 | 150 | retrieval-only | 1.0 | 0.952 | | | | | | |
+| vector | 150 | retrieval-only | 1.0 | **0.963** | | | | | | |
+| hybrid | 150 | retrieval-only | 1.0 | **0.963** | | | | | | |
+| bm25 | 350 | retrieval-only | 1.0 | 0.954 | | | | | | |
+| vector | 350 | retrieval-only | 1.0 | 0.950 | | | | | | |
+| **hybrid** | **350** | **full** | **1.0** | **0.963** | **0.0** | **1.0 (10/10)** | **0** | **0.95** | **0.988** | 1.3 s |
+
+What changed versus the fake run: with real embeddings the dense retriever is as good as or
+better than BM25 on MRR, and hybrid takes the best of both (0.963) — the hybrid thesis holds on
+this corpus. On the answer side, every one of the 10 unanswerable questions (6 out-of-scope, 4
+cross-region including the prompt injection) was refused, no answerable question was wrongly
+refused, no answer cited a document outside the user's region, and the LLM judge rated 38 of 40
+answers fully supported by their citations. Raw per-question rows are in
+`eval/results/results_groq+fastembed.json`.
 
 ## Security notes
 

@@ -7,7 +7,7 @@ stateless and safe to redeploy at will.
 ## 1. Get a free key
 
 **Groq (default, free):** <https://console.groq.com> → API Keys → Create. Chat runs on
-`llama-3.3-70b-versatile`; vectors come from a local `fastembed` model (`BAAI/bge-small-en-v1.5`,
+`openai/gpt-oss-120b`; vectors come from a local `fastembed` model (`BAAI/bge-small-en-v1.5`,
 384 dims, ~130 MB downloaded once and baked into the Docker image), because Groq has no
 embeddings endpoint.
 
@@ -21,7 +21,7 @@ Never commit a key. Locally it goes in `.env` (git-ignored); on Render it goes i
 | Variable | Default | Notes |
 |---|---|---|
 | `LLM_PROVIDER` | `fake` | `fake` \| `groq` \| `gemini` \| `openai`. `fake` needs no key and is what CI uses. |
-| `LLM_MODEL` | provider default | `llama-3.3-70b-versatile` / `gemini-2.5-flash` / `gpt-4o-mini` |
+| `LLM_MODEL` | provider default | `openai/gpt-oss-120b` / `gemini-2.5-flash` / `gpt-4o-mini` |
 | `EMBED_MODEL` | provider default | `BAAI/bge-small-en-v1.5` (groq, local) / `gemini-embedding-001` / `text-embedding-3-small` |
 | `GROQ_API_KEY` | — | Required when `LLM_PROVIDER=groq` |
 | `FASTEMBED_CACHE_DIR` | fastembed default | Where the local embedding model is stored (`/opt/fastembed` in the image) |
@@ -36,7 +36,7 @@ Never commit a key. Locally it goes in `.env` (git-ignored); on Render it goes i
 | `REFUSAL_THRESHOLD` | `0.02` | Minimum top fused score to call the model |
 | `CONTEXT_BUDGET_TOKENS` | `1800` | Max retrieved tokens packed into the prompt |
 | `CACHE_CAPACITY` / `CACHE_SIMILARITY_THRESHOLD` | `256` / `0.95` | Semantic cache |
-| `PRICE_INPUT_PER_1M` / `PRICE_OUTPUT_PER_1M` / `PRICE_EMBED_PER_1M` | `0.59` / `0.79` / `0` | USD per 1M tokens for the cost estimate (defaults ≈ Groq Llama 3.3 70B list price; local embeddings are free); set to your provider's current price sheet |
+| `PRICE_INPUT_PER_1M` / `PRICE_OUTPUT_PER_1M` / `PRICE_EMBED_PER_1M` | `0.15` / `0.60` / `0` | USD per 1M tokens for the cost estimate (defaults ≈ Groq gpt-oss-120b list price; local embeddings are free); set to your provider's current price sheet |
 | `PORT` | `8000` | Render sets this automatically |
 
 ## 3. Render (recommended, free tier)

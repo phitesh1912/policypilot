@@ -86,6 +86,10 @@ class Engine:
         hits = self.retriever.search(question, user, self.settings.retrieval_k, **kwargs)
         return q_vec, hits
 
+    def retrieve(self, question: str, user: User) -> list[RetrievedChunk]:
+        """Retrieval only (no cache, no model). Used by the eval to score retrievers cheaply."""
+        return self._retrieve(question, user)[1]
+
     def _gate(self, hits: list[RetrievedChunk]) -> bool:
         """True if retrieval is confident enough to involve the model."""
         return bool(hits) and hits[0].score >= self.settings.refusal_threshold

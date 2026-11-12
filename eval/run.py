@@ -69,6 +69,9 @@ def run_config(
     chunk_tokens: int,
     settings: Settings,
     use_llm_judge: bool,
+    *,
+    answer: bool = True,
+    pace_seconds: float = 0.0,
 ) -> tuple[dict, list[dict]]:
     chunker = Chunker(chunk_tokens=chunk_tokens, overlap_tokens=min(50, chunk_tokens // 5))
     retriever = build_retriever(retriever_kind, provider, settings.rrf_k)
@@ -82,7 +85,37 @@ def run_config(
 
     agg = Aggregate()
     rows: list[dict] = []
+
+    if not answer:
+        # Retrieval-only scoring: no model calls, so every configuration can be compared for free
+        # even when the chat provider is rate-limited. Answer-level metrics are left blank.
+        for item in items:
+            if not item["answerable"]:
+                continue
+            ranked = [
+                h.chunk.chunk_id for h in engine.retrieve(item["question"], User(**item["user"]))
+            ]
+            expected = set(item["expected"])
+            agg.n_answerable += 1
+            agg.hit5 += hit_at_k(ranked, expected, 5)
+            agg.mrr += reciprocal_rank(ranked, expected)
+            rows.append({"id": item["id"], "top5": [section_id(c) for c in ranked[:5]]})
+        n = max(agg.n_answerable, 1)
+        summary = {
+            "retriever": retriever_kind,
+            "chunk_tokens": chunk_tokens,
+            "chunks": stats.chunks,
+            "answerable": agg.n_answerable,
+            "unanswerable": 0,
+            "hit@5": round(agg.hit5 / n, 3),
+            "mrr": round(agg.mrr / n, 3),
+            "mode": "retrieval-only",
+        }
+        return summary, rows
+
     for item in items:
+        if pace_seconds and rows:
+            time.sleep(pace_seconds)
         user = User(**item["user"])
         expected = set(item["expected"])
         t0 = time.perf_counter()
@@ -142,6 +175,7 @@ def run_config(
         "chunks": stats.chunks,
         **agg.summary(),
         "region_leaks": sum(1 for r in rows if r.get("leaked_region")),
+        "mode": "full",
     }
     return summary, rows
 
@@ -168,6 +202,7 @@ def to_markdown(summaries: list[dict], provider_name: str, judge: str) -> str:
         "retriever",
         "chunk_tokens",
         "chunks",
+        "mode",
         "hit@5",
         "mrr",
         "false_refusal_rate",
@@ -180,12 +215,14 @@ def to_markdown(summaries: list[dict], provider_name: str, judge: str) -> str:
         "avg_latency_ms",
         "total_cost_usd",
     ]
+    # Counts from a full-mode row if there is one; retrieval-only rows skip unanswerable items.
+    counts = next((s for s in summaries if s.get("mode") == "full"), summaries[0])
     lines = [
         f"# Eval results — provider `{provider_name}`, judge: {judge}",
         "",
         f"Run at {datetime.now(UTC).isoformat(timespec='seconds')} over "
-        f"{summaries[0]['answerable'] + summaries[0]['unanswerable']} golden questions "
-        f"({summaries[0]['answerable']} answerable, {summaries[0]['unanswerable']} unanswerable).",
+        f"{counts['answerable'] + counts['unanswerable']} golden questions "
+        f"({counts['answerable']} answerable, {counts['unanswerable']} unanswerable).",
         "",
         "| " + " | ".join(cols) + " |",
         "|" + "|".join("---" for _ in cols) + "|",
@@ -197,7 +234,8 @@ def to_markdown(summaries: list[dict], provider_name: str, judge: str) -> str:
         "Metric notes: hit@5 / MRR are at *section* granularity (doc_id:section). "
         "`refusal_accuracy` is the share of unanswerable questions that got the refusal text; "
         "`region_leaks` counts answers that cited a document outside the user's region "
-        "(must be 0).",
+        "(must be 0). Rows in `retrieval-only` mode score retrieval without calling the model, "
+        "so their answer-level columns are blank.",
     ]
     if provider_name == "fake":
         lines += [
@@ -222,25 +260,63 @@ def main(argv: list[str] | None = None) -> int:
     # (e.g. 700) produce the same chunks as 350 on this corpus because no section is that long.
     ap.add_argument("--chunk-sizes", default="150,350")
     ap.add_argument("--retrievers", default="bm25,vector,hybrid")
+    ap.add_argument(
+        "--answer-configs",
+        default=None,
+        help="comma list like 'hybrid-350' of configs that call the model; others are scored "
+        "retrieval-only. Default: all for the fake provider, 'hybrid-350' for real ones.",
+    )
+    ap.add_argument(
+        "--pace",
+        type=float,
+        default=None,
+        help="seconds between model-backed questions (default 0 fake / 8 real; "
+        "free tiers cap tokens per minute)",
+    )
     ap.add_argument("--out", default=str(RESULTS))
     args = ap.parse_args(argv)
 
     settings = Settings(llm_provider=args.provider)
     provider = build_provider(settings)
-    use_llm_judge = provider.name != "fake"
+    is_fake = provider.name == "fake"
+    use_llm_judge = not is_fake
+    answer_configs = (
+        None
+        if is_fake and args.answer_configs is None
+        else set((args.answer_configs or "hybrid-350").split(","))
+    )
+    pace = args.pace if args.pace is not None else (0.0 if is_fake else 8.0)
     items = json.loads(GOLDEN.read_text(encoding="utf-8"))["items"]
+    print(
+        f"provider={provider.name} chat={provider.chat_model} "
+        f"embed={provider.embed_model} pace={pace}s"
+    )
 
     summaries: list[dict] = []
     all_rows: dict[str, list[dict]] = {}
     for chunk_tokens in (int(x) for x in args.chunk_sizes.split(",")):
         for kind in args.retrievers.split(","):
-            print(f"running {kind:7s} chunk={chunk_tokens} ...", end=" ", flush=True)
-            summary, rows = run_config(items, provider, kind, chunk_tokens, settings, use_llm_judge)
+            key = f"{kind}-{chunk_tokens}"
+            answer = answer_configs is None or key in answer_configs
+            mode = "full" if answer else "retrieval-only"
+            print(f"running {kind:7s} chunk={chunk_tokens} {mode} ...", end=" ", flush=True)
+            summary, rows = run_config(
+                items,
+                provider,
+                kind,
+                chunk_tokens,
+                settings,
+                use_llm_judge,
+                answer=answer,
+                pace_seconds=pace,
+            )
             summaries.append(summary)
-            all_rows[f"{kind}-{chunk_tokens}"] = rows
+            all_rows[key] = rows
             print(
                 f"hit@5={summary['hit@5']} mrr={summary['mrr']} "
-                f"refusal_acc={summary['refusal_accuracy']} leaks={summary['region_leaks']}"
+                f"refusal_acc={summary.get('refusal_accuracy', '-')} "
+                f"leaks={summary.get('region_leaks', '-')}",
+                flush=True,
             )
 
     out = Path(args.out)
